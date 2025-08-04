@@ -1,12 +1,12 @@
 # Donut 3D SVG
 
-Projeto para renderizar uma rosquinha 3D animada em SVG usando Next.js, com cálculo da geometria no backend e animação no frontend.
+Projeto para renderizar uma rosquinha 3D animada em SVG usando Next.js, com cálculo da geometria no backend.
 
 ---
 
 ## Descrição
 
-Este projeto gera um torus (rosquinha) 3D via SVG, utilizando cálculo matemático para criar a geometria e projeção em 2D. A renderização ocorre no backend via API em Next.js, que retorna o SVG gerado dinamicamente com base na rotação fornecida. O frontend busca o SVG atualizado para criar uma animação suave.
+Este projeto gera um torus (rosquinha) 3D via SVG, utilizando cálculo matemático para criar a geometria e projeção em 2D. A renderização ocorre no backend via API em Next.js, que retorna o SVG gerado dinamicamente com base na rotação fornecida.
 
 ---
 
