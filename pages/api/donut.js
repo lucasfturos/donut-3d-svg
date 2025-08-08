@@ -5,6 +5,12 @@ import { project, rotate } from "@lib/Vec3";
 const torus = new Torus(0.5, 1, 30);
 const { indices, vertices } = torus.sources();
 
+export const config = {
+    api: {
+        responseLimit: false,
+    },
+};
+
 export default function handler(req, res) {
     const color = { r: 0, g: 0, b: 255 };
     const hasRotationParams =
@@ -30,7 +36,7 @@ export default function handler(req, res) {
 function createTriangles(indices, vertices) {
     const triangles = [];
     for (let i = 0; i < indices.length; i += 3) {
-        const a = vertices[indices[i]];
+        const a = vertices[indices[i + 0]];
         const b = vertices[indices[i + 1]];
         const c = vertices[indices[i + 2]];
         const zAvg = (a.z + b.z + c.z) / 3;
@@ -46,8 +52,8 @@ function generateDonutSVG(color, rotation) {
     const triangles = createTriangles(indices, projected);
     triangles.sort((t1, t2) => t1.z - t2.z);
 
-    const paths = triangles.map(({ a, b, c }) => {
-        const shade = getShadeColor((a.z + b.z + c.z) / 3, color);
+    const paths = triangles.map(({ a, b, c, z }) => {
+        const shade = getShadeColor(z, color);
         return `<polygon points="${formatPoint(a)} ${formatPoint(
             b
         )} ${formatPoint(c)}" fill="${shade}" stroke="none" />`;
@@ -68,6 +74,9 @@ function generateAnimatedDonutSVG(color) {
     const FRAME_DURATION = 0.1;
     const DURATION = TOTAL_FRAMES * FRAME_DURATION;
 
+    const baseTriangles = createTriangles(indices, vertices);
+    baseTriangles.sort((t1, t2) => t1.z - t2.z);
+
     const frames = [];
     for (let f = 0; f < TOTAL_FRAMES; f++) {
         const theta = {
@@ -77,8 +86,20 @@ function generateAnimatedDonutSVG(color) {
         };
         const rotated = vertices.map((v) => rotate(v, theta));
         const projected = rotated.map(project);
-        const triangles = createTriangles(indices, projected);
-        frames.push(triangles);
+        frames.push(
+            baseTriangles.map((tri) => {
+                const pa = projected[vertices.indexOf(tri.a)];
+                const pb = projected[vertices.indexOf(tri.b)];
+                const pc = projected[vertices.indexOf(tri.c)];
+                const zAvg = (tri.z * (pa.z + pb.z + pc.z)) / 3;
+                return {
+                    a: pa,
+                    b: pb,
+                    c: pc,
+                    z: zAvg,
+                };
+            })
+        );
     }
 
     let polygonsSVG = "";

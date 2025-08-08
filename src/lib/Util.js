@@ -5,7 +5,7 @@ export function formatPoint(p) {
 }
 
 export function getShadeColor(z, base) {
-    const shade = Math.max(0, Math.min(1, (1 - z) * 0.5 + 0.5));
+const shade = Math.max(0.3, Math.min(1, (1 - z) * 0.7 + 0.3));
     const r = Math.floor(base.r * shade);
     const g = Math.floor(base.g * shade);
     const b = Math.floor(base.b * shade);

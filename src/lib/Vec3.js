@@ -30,27 +30,3 @@ export function project(v) {
         z: v.z,
     };
 }
-
-/* export function calcNormal(a, b, c) {
-    const U = {
-        x: b.x - a.x,
-        y: b.y - a.y,
-        z: b.z - a.z,
-    };
-    const V = {
-        x: c.x - a.x,
-        y: c.y - a.y,
-        z: c.z - a.z,
-    };
-
-    return {
-        x: U.y * V.z - U.z * V.y,
-        y: U.z * V.x - U.x * V.z,
-        z: U.x * V.y - U.y * V.x,
-    };
-}
-
-export function dot(v1, v2) {
-    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-}
- */
