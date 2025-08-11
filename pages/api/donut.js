@@ -1,9 +1,14 @@
 import { Torus } from "@lib/Torus";
 import { formatPoint, getShadeColor } from "@lib/Util";
-import { project, rotate } from "@lib/Vec3";
+import { getVertex, project, rotate } from "@lib/Vec3";
 
-const torus = new Torus(0.5, 1, 30);
+const torus = new Torus(0.5, 1, 20);
 const { indices, vertices } = torus.sources();
+
+const TOTAL_FRAMES = 40;
+const ROTATION_SPEED = (2 * Math.PI) / TOTAL_FRAMES;
+const FRAME_DURATION = 0.1;
+const DURATION = TOTAL_FRAMES * FRAME_DURATION;
 
 export const config = {
     api: {
@@ -23,12 +28,12 @@ export default function handler(req, res) {
             y: parseFloat(req.query.ry || "0"),
             z: parseFloat(req.query.rz || "0"),
         };
-        svg = generateDonutSVG(color, theta);
+        svg = generateTorusSVG(color, theta);
     } else {
-        svg = generateAnimatedDonutSVG(color);
+        svg = generateAnimatedTorusSVG(color);
     }
 
-    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+    res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate");
     res.setHeader("Content-Type", "image/svg+xml");
     res.status(200).send(svg);
 }
@@ -36,24 +41,46 @@ export default function handler(req, res) {
 function createTriangles(indices, vertices) {
     const triangles = [];
     for (let i = 0; i < indices.length; i += 3) {
-        const a = vertices[indices[i + 0]];
-        const b = vertices[indices[i + 1]];
-        const c = vertices[indices[i + 2]];
+        const a = getVertex(vertices, indices[i + 0]);
+        const b = getVertex(vertices, indices[i + 1]);
+        const c = getVertex(vertices, indices[i + 2]);
         const zAvg = (a.z + b.z + c.z) / 3;
-        triangles.push({ a, b, c, z: zAvg });
+        triangles.push({
+            a,
+            b,
+            c,
+            z: zAvg,
+            aIndex: indices[i + 0],
+            bIndex: indices[i + 1],
+            cIndex: indices[i + 2],
+        });
     }
     return triangles;
 }
 
-function generateDonutSVG(color, rotation) {
-    const rotated = vertices.map((v) => rotate(v, rotation));
+function generateTorusSVG(color, rotation) {
+    const rotated = [...Array(vertices.length / 3).keys()].map((i) => {
+        return rotate(
+            {
+                x: vertices[i * 3 + 0],
+                y: vertices[i * 3 + 1],
+                z: vertices[i * 3 + 2],
+            },
+            rotation
+        );
+    });
+
     const projected = rotated.map(project);
 
-    const triangles = createTriangles(indices, projected);
-    triangles.sort((t1, t2) => t1.z - t2.z);
+    const baseTriangles = createTriangles(indices, vertices);
+    baseTriangles.sort((t1, t2) => t1.z - t2.z);
 
-    const paths = triangles.map(({ a, b, c, z }) => {
-        const shade = getShadeColor(z, color);
+    const paths = baseTriangles.map((tri) => {
+        const a = projected[tri.aIndex];
+        const b = projected[tri.bIndex];
+        const c = projected[tri.cIndex];
+
+        const shade = getShadeColor((a.z + b.z + c.z) / 3, color);
         return `<polygon points="${formatPoint(a)} ${formatPoint(
             b
         )} ${formatPoint(c)}" fill="${shade}" stroke="none" />`;
@@ -68,64 +95,62 @@ function generateDonutSVG(color, rotation) {
 </svg>`;
 }
 
-function generateAnimatedDonutSVG(color) {
-    const TOTAL_FRAMES = 60;
-    const ROTATION_SPEED = (2 * Math.PI) / TOTAL_FRAMES;
-    const FRAME_DURATION = 0.1;
-    const DURATION = TOTAL_FRAMES * FRAME_DURATION;
-
+function generateAnimatedTorusSVG(color) {
     const baseTriangles = createTriangles(indices, vertices);
     baseTriangles.sort((t1, t2) => t1.z - t2.z);
 
-    const frames = [];
+    const framesVertices = [];
     for (let f = 0; f < TOTAL_FRAMES; f++) {
+        const angle = f * ROTATION_SPEED;
         const theta = {
-            x: 0.8 * Math.sin(f * ROTATION_SPEED),
-            y: f * ROTATION_SPEED,
-            z: 0.6 * Math.cos(f * ROTATION_SPEED),
+            x: 0.8 * Math.sin(angle),
+            y: angle,
+            z: 0.6 * Math.sin(angle),
         };
-        const rotated = vertices.map((v) => rotate(v, theta));
+
+        const rotated = [...Array(vertices.length / 3).keys()].map((i) => {
+            return rotate(
+                {
+                    x: vertices[i * 3 + 0],
+                    y: vertices[i * 3 + 1],
+                    z: vertices[i * 3 + 2],
+                },
+                theta
+            );
+        });
         const projected = rotated.map(project);
-        frames.push(
-            baseTriangles.map((tri) => {
-                const pa = projected[vertices.indexOf(tri.a)];
-                const pb = projected[vertices.indexOf(tri.b)];
-                const pc = projected[vertices.indexOf(tri.c)];
-                const zAvg = (tri.z * (pa.z + pb.z + pc.z)) / 3;
-                return {
-                    a: pa,
-                    b: pb,
-                    c: pc,
-                    z: zAvg,
-                };
-            })
-        );
+        framesVertices.push(projected);
     }
 
     let polygonsSVG = "";
-    for (let index = 0; index < frames[0].length; index++) {
+    for (let triIndex = 0; triIndex < baseTriangles.length; triIndex++) {
         const pointsFrames = [];
         const colorsFrames = [];
+        const tri = baseTriangles[triIndex];
 
         for (let f = 0; f < TOTAL_FRAMES; f++) {
-            const t = frames[f][index];
+            const projected = framesVertices[f];
+            const a = projected[tri.aIndex];
+            const b = projected[tri.bIndex];
+            const c = projected[tri.cIndex];
+
             pointsFrames.push(
-                `${formatPoint(t.a)} ${formatPoint(t.b)} ${formatPoint(t.c)}`
+                `${formatPoint(a)} ${formatPoint(b)} ${formatPoint(c)}`
             );
-            const shade = getShadeColor(t.z, color);
-            colorsFrames.push(shade);
+            const zAvg = (a.z + b.z + c.z) / 3;
+            colorsFrames.push(getShadeColor(zAvg, color));
         }
 
         polygonsSVG += `<polygon points="${pointsFrames[0]}" fill="${
             colorsFrames[0]
         }" stroke="none">
-            <animate attributeName="points" values="${pointsFrames.join(
-                ";"
-            )}" dur="${DURATION}s" repeatCount="indefinite" />
-            <animate attributeName="fill" values="${colorsFrames.join(
-                ";"
-            )}" dur="${DURATION}s" repeatCount="indefinite" />
-        </polygon>\n    `;
+    <animate attributeName="points" values="${pointsFrames.join(
+        ";"
+    )}" dur="${DURATION}s" repeatCount="indefinite" />
+    <animate attributeName="fill" values="${colorsFrames.join(
+        ";"
+    )}" dur="${DURATION}s" repeatCount="indefinite" />
+  </polygon>\n`;
     }
 
     return `<?xml version="1.0" encoding="UTF-8"?>

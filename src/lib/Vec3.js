@@ -30,3 +30,8 @@ export function project(v) {
         z: v.z,
     };
 }
+
+export function getVertex(vertices, index) {
+    const i = index * 3;
+    return { x: vertices[i], y: vertices[i + 1], z: vertices[i + 2] };
+}
